@@ -96,7 +96,7 @@ function logRedirectUri()
 function main()
 {
     const service = getService(); // OAuth2サービスの取得
-    
+
     if (service.hasAccess())
         Logger.log("Already authorized"); // すでに認証済みの場合のログ出力
     else
@@ -106,13 +106,27 @@ function main()
         }
 }
 
+
 /**
- * Googleスプレッドシートからデータを取得します。
+ * Googleスプレッドシートから予約データを取得します。
  * この関数は、スプレッドシートの全データを読み込み、それを返します。
  */
+
 function getSpreadsheetData()
 {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("予約"); // スプレッドシートの取得
+    const range = sheet.getDataRange(); // データ範囲の取得
+    return range.getValues(); // データの取得
+}
+
+
+/**
+ * Googleスプレッドシートから写真リンクデータを取得します。
+ * この関数は、スプレッドシートの全データを読み込み、それを返します。
+ */
+function getSpreadsheetData_Rinks()
+{
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("写真リンク"); // スプレッドシートの取得
     const range = sheet.getDataRange(); // データ範囲の取得
     return range.getValues(); // データの取得
 }
@@ -125,11 +139,12 @@ function postScheduledTweets()
 {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("予約"); // スプレッドシートの取得
     const rows = sheet.getDataRange().getValues(); // 全行のデータを取得
+    const Rinks = getSpreadsheetData_Rinks();
 
     const now = new Date(); // 現在の日時を取得
 
     // 各行に対する処理
-    for (let i = 1; i < rows.length; i++) 
+    for (let i = 1; i < rows.length; i++)
         {
         const [scheduledTime, tweetContent, status] = rows[i]; // 各列のデータを取得
 
@@ -140,45 +155,45 @@ function postScheduledTweets()
             sheet.getRange(i + 1, 3).setValue("投稿済"); // ステータスを「投稿済み」に更新
 
             // ランダムに未投稿も含めたすべての予約から選んで新しい予約を作成
-            const randomTweet = getRandomTweetContent(sheet); // ランダムなツイート内容を取得
+            const randomTweet = getRandomTweetContent(Rinks); // ランダムなツイート内容を取得
             scheduleTweetForFuture(scheduledTime, randomTweet); // 新しい予約を作成
             }
         }
 }
 
 /**
- * 未投稿を含むすべての投稿予約からランダムにツイート内容を取得する関数
- * @param {Object} sheet - スプレッドシートオブジェクト
- * @returns {string} ランダムに選ばれたツイート内容
+ * ランダムにツイート内容を取得する関数
+ * @param {Object} Rinks - スプレッドシートオブジェクト
+ * @returns {string} allRinks - ランダムに選ばれたツイート内容
  */
-function getRandomTweetContent(sheet)
+function getRandomTweetContent(Rinks)
 {
-    const rows = sheet.getDataRange().getValues(); // スプレッドシートの全データを取得
-    const allTweets = []; // すべてのツイート内容を格納する配列
+    const rows = Rinks.getDataRange().getValues(); // スプレッドシートの全データを取得
+    const allRinks = []; // すべてのリンクを格納する配列
 
-    // 各行をループして、ツイート内容を収集
-    for (let i = 1; i < rows.length; i++) 
+    // 各行をループして、リンクを収集
+    for (let i = 1; i < rows.length; i++)
         {
-        const [scheduledTime, tweetContent] = rows[i];
+        const [Num, Name, Rink] = rows[i];
 
-        // ツイート内容があればすべてリストに追加
-        if (tweetContent)
-      allTweets.push(tweetContent); // ツイート内容をリストに追加
+        // リンクがあればすべてリストに追加
+        if (Rink)
+            allRinks.push(Rink); // リンクをリストに追加
         }
 
-    // ランダムなインデックスを生成してツイートを選ぶ
-    const randomIndex = Math.floor(Math.random() * allTweets.length);
+    // ランダムなインデックスを生成してリンクを選ぶ
+    const randomIndex = Math.floor(Math.random() * allRinks.length);
 
-    // ランダムに選ばれたツイート内容を返す
-    return allTweets[randomIndex];
+    // ランダムに選ばれたリンクを返す
+    return allRinks[randomIndex];
 }
 
 /**
  * 14年後にランダムで選んだツイートを予約する関数
  * @param {string} scheduledTime - 元のスケジュール時間
- * @param {string} tweetContent - ツイート内容
+ * @param {string} Rink - リンク詳細
  */
-function scheduleTweetForFuture(scheduledTime, tweetContent)
+function scheduleTweetForFuture(scheduledTime, Rink)
 {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("予約"); // スプレッドシートの取得
 
@@ -187,7 +202,7 @@ function scheduleTweetForFuture(scheduledTime, tweetContent)
     futureDate.setFullYear(futureDate.getFullYear() + 14); // 14年を加算
 
     // スプレッドシートに新しい予約を追加
-    const newRow = [futureDate, tweetContent, ""];
+    const newRow = [futureDate, "チャレラ！開けロイト市警だ！"+Rink, ""];
     sheet.appendRow(newRow); // 新しい行を追加
 }
 
@@ -210,7 +225,7 @@ function sendTweet(tweetContent)
     if (service.hasAccess())
         {
         var url = 'https://api.twitter.com/2/tweets'; // Twitter APIのURL
-        var response = UrlFetchApp.fetch(url, 
+        var response = UrlFetchApp.fetch(url,
             {
             method: 'POST', // POSTリクエスト
             contentType: 'application/json', // コンテンツタイプ
@@ -221,14 +236,19 @@ function sendTweet(tweetContent)
 
         var result = JSON.parse(response.getContentText()); // レスポンスの解析
         Logger.log(JSON.stringify(result, null, 2)); // レスポンスのログ出力
-        } 
-    else 
+        }
+    else
         {
         var authorizationUrl = service.getAuthorizationUrl(); // 認証URLの取得
         Logger.log('Open the following URL and re-run the script: %s', authorizationUrl); // 認証URLのログ出力
         }
 }
 
+
+/**
+ * 指定した時間にツイートを送信するためのトリガーを作成します。
+ * この関数では、翌日の19:30に予約がされます。
+ */
 function createTrigger()
 {
     var allTriggers = ScriptApp.getProjectTriggers();
@@ -245,7 +265,7 @@ function createTrigger()
         }
 
     // すでに存在するトリガーがあれば削除
-    if (existingTrigger !== null) 
+    if (existingTrigger !== null)
         ScriptApp.deleteTrigger(existingTrigger);
 
     postScheduledTweets();
@@ -265,4 +285,42 @@ function createTrigger()
     // トリガー設定日時を記録
     var scriptProperties = PropertiesService.getScriptProperties();
     scriptProperties.setProperty('TriggerSetAt', triggerDay.toString());
+}
+
+/**
+ * 以下テスト用関数
+ * それぞれを直接実行することで、動作ログを確認できます。
+ */
+
+function testScheduleTweetForFuture()
+{
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("予約"); // スプレッドシートの取得
+    const testDate = new Date(); // テスト用の現在の日時を取得
+    testDate.setFullYear(testDate.getFullYear() + 14); // 14年を加算
+
+    // テスト用のリンク内容（ここで仮のリンクを指定）
+    const testRink = "https://example.com/test";
+
+    // 新しい行の内容をスプレッドシートに追加
+    const newRow = [testDate, "チャレラ！開けロイト市警だ！" + testRink, ""];
+    sheet.appendRow(newRow); // 新しい行を追加
+}
+
+function testGetRandomTweetContent()
+{
+    // 「写真リンク」シートのオブジェクトを取得
+    const Rinks = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("写真リンク");
+
+    // シートが存在するか確認
+    if (!Rinks)
+        {
+        Logger.log("写真リンクシートが見つかりません");
+        return;
+        }
+
+    // ランダムなリンクを取得
+    const randomContent = getRandomTweetContent(Rinks);
+
+    // ログに出力
+    Logger.log("取得したランダムリンク: " + randomContent);
 }
